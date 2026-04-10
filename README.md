@@ -597,5 +597,3 @@ Este projeto é privado e proprietário. Todos os direitos reservados.
 Feito com ❤️ para equipes de vendas mais produtivas
 
 </div>
-#   C R M _ D G G r o w t h  
- 
