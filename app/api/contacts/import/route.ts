@@ -34,6 +34,11 @@ type ParsedRow = {
   status?: string;
   stage?: string;
   notes?: string;
+  whatsapp?: string;
+  instagram?: string;
+  cnpj?: string;
+  address?: string;
+  score?: string;
 };
 
 const HEADER_SYNONYMS: Record<keyof ParsedRow, string[]> = {
@@ -41,12 +46,17 @@ const HEADER_SYNONYMS: Record<keyof ParsedRow, string[]> = {
   firstName: ['first name', 'firstname', 'primeiro nome', 'nome'],
   lastName: ['last name', 'lastname', 'sobrenome'],
   email: ['email', 'e-mail', 'e-mail address', 'mail'],
-  phone: ['phone', 'telefone', 'celular', 'whatsapp', 'fone'],
+  phone: ['phone', 'telefone', 'celular', 'fone'],
   role: ['role', 'cargo', 'titulo', 'title', 'funcao', 'funçao', 'funcao/cargo'],
   company: ['company', 'empresa', 'conta', 'account', 'organization', 'organizacao', 'organização'],
   status: ['status'],
   stage: ['stage', 'etapa', 'lifecycle stage', 'ciclo de vida', 'pipeline stage'],
   notes: ['notes', 'nota', 'notas', 'observacoes', 'observações', 'obs'],
+  whatsapp: ['whatsapp', 'whats', 'wpp', 'wa'],
+  instagram: ['instagram', 'insta', 'ig'],
+  cnpj: ['cnpj'],
+  address: ['address', 'endereco', 'endereço', 'end'],
+  score: ['score', 'pontuacao', 'pontuação'],
 };
 
 function buildHeaderIndex(headers: string[]) {
@@ -73,6 +83,11 @@ function buildHeaderIndex(headers: string[]) {
     status: find(HEADER_SYNONYMS.status),
     stage: find(HEADER_SYNONYMS.stage),
     notes: find(HEADER_SYNONYMS.notes),
+    whatsapp: find(HEADER_SYNONYMS.whatsapp),
+    instagram: find(HEADER_SYNONYMS.instagram),
+    cnpj: find(HEADER_SYNONYMS.cnpj),
+    address: find(HEADER_SYNONYMS.address),
+    score: find(HEADER_SYNONYMS.score),
   };
 
   return mapping;
@@ -171,6 +186,11 @@ export async function POST(req: Request) {
           status: normalizeStatus(getCell(r, mapping.status)),
           stage: normalizeStage(getCell(r, mapping.stage)),
           notes: getCell(r, mapping.notes),
+          whatsapp: getCell(r, mapping.whatsapp),
+          instagram: getCell(r, mapping.instagram),
+          cnpj: getCell(r, mapping.cnpj),
+          address: getCell(r, mapping.address),
+          score: getCell(r, mapping.score),
         },
       });
     }
@@ -306,6 +326,8 @@ export async function POST(req: Request) {
       const companyName = (p.data.company || '').trim();
       const companyId = companyName ? companyIdByName.get(normalizeHeader(companyName)) : undefined;
 
+      const scoreNum = p.data.score ? parseInt(p.data.score, 10) : null;
+
       const base = {
         name: p.data.name || '',
         email: p.data.email || null,
@@ -317,6 +339,11 @@ export async function POST(req: Request) {
         stage: p.data.stage || 'LEAD',
         organization_id: orgId,
         updated_at: new Date().toISOString(),
+        whatsapp: p.data.whatsapp || null,
+        instagram: p.data.instagram || null,
+        cnpj: p.data.cnpj || null,
+        address: p.data.address || null,
+        score: !isNaN(scoreNum!) && scoreNum !== null ? scoreNum : null,
       };
 
       const existingIds = email ? (contactIdsByEmail.get(email) || []) : [];

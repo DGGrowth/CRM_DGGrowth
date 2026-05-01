@@ -81,6 +81,16 @@ export interface DbContact {
   owner_id: string | null;
   /** Quando true, o agente de IA não responde a este contato. */
   ai_paused: boolean;
+  /** Número ou URL do WhatsApp. */
+  whatsapp: string | null;
+  /** URL do perfil do Instagram. */
+  instagram: string | null;
+  /** CNPJ da empresa do contato. */
+  cnpj: string | null;
+  /** Endereço completo. */
+  address: string | null;
+  /** Score de prospecção (0-100). */
+  score: number | null;
 }
 
 /**
@@ -134,6 +144,11 @@ const transformContact = (db: DbContact): Contact => ({
   createdAt: db.created_at,
   updatedAt: db.updated_at,
   aiPaused: db.ai_paused ?? false,
+  whatsapp: db.whatsapp || undefined,
+  instagram: db.instagram || undefined,
+  cnpj: db.cnpj || undefined,
+  address: db.address || undefined,
+  score: db.score ?? undefined,
 });
 
 /**
@@ -181,6 +196,11 @@ const transformContactToDb = (contact: Partial<Contact>): Partial<DbContact> => 
   if (contact.lastPurchaseDate !== undefined) db.last_purchase_date = contact.lastPurchaseDate || null;
   if (contact.totalValue !== undefined) db.total_value = contact.totalValue;
   if (contact.aiPaused !== undefined) db.ai_paused = contact.aiPaused;
+  if (contact.whatsapp !== undefined) db.whatsapp = contact.whatsapp || null;
+  if (contact.instagram !== undefined) db.instagram = contact.instagram || null;
+  if (contact.cnpj !== undefined) db.cnpj = contact.cnpj || null;
+  if (contact.address !== undefined) db.address = contact.address || null;
+  if (contact.score !== undefined) db.score = contact.score ?? null;
 
   return db;
 };
@@ -438,6 +458,11 @@ export const contactsService = {
         last_interaction: sanitizeText(contact.lastInteraction),
         last_purchase_date: sanitizeText(contact.lastPurchaseDate),
         total_value: sanitizeNumber(contact.totalValue, 0),
+        whatsapp: sanitizeText(contact.whatsapp),
+        instagram: sanitizeText(contact.instagram),
+        cnpj: sanitizeText(contact.cnpj),
+        address: sanitizeText(contact.address),
+        score: contact.score ?? null,
         ...(organizationId ? { organization_id: organizationId } : {}),
       };
 

@@ -11,6 +11,11 @@ interface ContactFormData {
   phone: string;
   role: string;
   companyName: string;
+  whatsapp?: string;
+  instagram?: string;
+  cnpj?: string;
+  address?: string;
+  score?: number;
 }
 
 interface ContactFormModalProps {
@@ -181,6 +186,65 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
                 ? 'Edite para alterar a empresa. Deixe em branco para desvincular.'
                 : 'Se a empresa já existir, o contato será vinculado a ela.'}
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+              <input
+                type="text"
+                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="https://wa.me/5515999999999"
+                value={formData.whatsapp || ''}
+                onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Instagram</label>
+              <input
+                type="text"
+                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="https://instagram.com/clinica"
+                value={formData.instagram || ''}
+                onChange={e => setFormData({ ...formData, instagram: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CNPJ</label>
+              <input
+                type="text"
+                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="00.000.000/0000-00"
+                value={formData.cnpj || ''}
+                onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Score</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="0-100"
+                value={formData.score ?? ''}
+                onChange={e => setFormData({ ...formData, score: e.target.value ? Number(e.target.value) : undefined })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço</label>
+            <input
+              type="text"
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="Rua, número - Bairro, Cidade - UF"
+              value={formData.address || ''}
+              onChange={e => setFormData({ ...formData, address: e.target.value })}
+            />
           </div>
 
             <button

@@ -113,6 +113,11 @@ export const contactFormSchema = z.object({
   phone: phoneSchema,
   role: optionalString.pipe(z.string().max(MAX_LENGTHS.SHORT_TEXT)),
   companyName: optionalString.pipe(z.string().max(MAX_LENGTHS.COMPANY_NAME)),
+  whatsapp: z.string().max(MAX_LENGTHS.URL).optional().transform(val => val || ''),
+  instagram: z.string().max(MAX_LENGTHS.URL).optional().transform(val => val || ''),
+  cnpj: z.string().max(MAX_LENGTHS.SHORT_TEXT).optional().transform(val => val || ''),
+  address: z.string().max(MAX_LENGTHS.DESCRIPTION).optional().transform(val => val || ''),
+  score: z.coerce.number().int().min(0).max(100).optional().transform(val => val ?? 0),
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;

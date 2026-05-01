@@ -169,6 +169,13 @@ export interface Contact {
   createdAt: string;
   updatedAt?: string; // Última modificação do registro
 
+  // Campos de prospecção
+  whatsapp?: string; // Número ou URL do WhatsApp
+  instagram?: string; // URL do perfil do Instagram
+  cnpj?: string; // CNPJ da empresa
+  address?: string; // Endereço completo
+  score?: number; // Score de prospecção (0-100)
+
   // @deprecated - Use clientCompanyId instead
   companyId?: string;
 
