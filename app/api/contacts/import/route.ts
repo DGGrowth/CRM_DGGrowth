@@ -36,27 +36,31 @@ type ParsedRow = {
   notes?: string;
   whatsapp?: string;
   instagram?: string;
+  website?: string;
   cnpj?: string;
   address?: string;
   score?: string;
+  socios?: string;
 };
 
 const HEADER_SYNONYMS: Record<keyof ParsedRow, string[]> = {
   name: ['name', 'nome', 'nome completo', 'full name'],
-  firstName: ['first name', 'firstname', 'primeiro nome', 'nome'],
+  firstName: ['first name', 'firstname', 'primeiro nome'],
   lastName: ['last name', 'lastname', 'sobrenome'],
-  email: ['email', 'e-mail', 'e-mail address', 'mail'],
+  email: ['email', 'e-mail', 'e-mail address', 'mail', 'email do site', 'email oficial'],
   phone: ['phone', 'telefone', 'celular', 'fone'],
   role: ['role', 'cargo', 'titulo', 'title', 'funcao', 'funçao', 'funcao/cargo'],
-  company: ['company', 'empresa', 'conta', 'account', 'organization', 'organizacao', 'organização'],
-  status: ['status'],
-  stage: ['stage', 'etapa', 'lifecycle stage', 'ciclo de vida', 'pipeline stage'],
+  company: ['company', 'empresa', 'conta', 'account', 'organization', 'organizacao', 'organização', 'razao social', 'razão social'],
+  status: ['status', 'situacao', 'situação'],
+  stage: ['stage', 'etapa', 'lifecycle stage', 'ciclo de vida', 'pipeline stage', 'crm status'],
   notes: ['notes', 'nota', 'notas', 'observacoes', 'observações', 'obs'],
   whatsapp: ['whatsapp', 'whats', 'wpp', 'wa'],
   instagram: ['instagram', 'insta', 'ig'],
+  website: ['website', 'site', 'url', 'web'],
   cnpj: ['cnpj'],
   address: ['address', 'endereco', 'endereço', 'end'],
   score: ['score', 'pontuacao', 'pontuação'],
+  socios: ['socios', 'sócios', 'socios/razao social', 'razao social dos socios'],
 };
 
 function buildHeaderIndex(headers: string[]) {
@@ -85,9 +89,11 @@ function buildHeaderIndex(headers: string[]) {
     notes: find(HEADER_SYNONYMS.notes),
     whatsapp: find(HEADER_SYNONYMS.whatsapp),
     instagram: find(HEADER_SYNONYMS.instagram),
+    website: find(HEADER_SYNONYMS.website),
     cnpj: find(HEADER_SYNONYMS.cnpj),
     address: find(HEADER_SYNONYMS.address),
     score: find(HEADER_SYNONYMS.score),
+    socios: find(HEADER_SYNONYMS.socios),
   };
 
   return mapping;
@@ -164,11 +170,15 @@ export async function POST(req: Request) {
       const name = getCell(r, mapping.name);
       const email = getCell(r, mapping.email);
       const phone = getCell(r, mapping.phone);
+      const socios = getCell(r, mapping.socios);
+
+      // Se não tem nome mas tem Sócios, usa o primeiro sócio como nome
+      const nameFromSocios = socios ? socios.split(',')[0].trim() : undefined;
 
       const computedName =
         (firstName || lastName)
           ? [firstName, lastName].filter(Boolean).join(' ').trim()
-          : name;
+          : (name || nameFromSocios);
 
       if (!computedName && !email) {
         errors.push({ rowNumber, message: 'Linha sem nome e sem email (não consigo criar contato).' });
@@ -188,9 +198,11 @@ export async function POST(req: Request) {
           notes: getCell(r, mapping.notes),
           whatsapp: getCell(r, mapping.whatsapp),
           instagram: getCell(r, mapping.instagram),
+          website: getCell(r, mapping.website),
           cnpj: getCell(r, mapping.cnpj),
           address: getCell(r, mapping.address),
           score: getCell(r, mapping.score),
+          socios: socios,
         },
       });
     }
@@ -341,9 +353,11 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
         whatsapp: p.data.whatsapp || null,
         instagram: p.data.instagram || null,
+        website: p.data.website || null,
         cnpj: p.data.cnpj || null,
         address: p.data.address || null,
         score: !isNaN(scoreNum!) && scoreNum !== null ? scoreNum : null,
+        socios: p.data.socios || null,
       };
 
       const existingIds = email ? (contactIdsByEmail.get(email) || []) : [];

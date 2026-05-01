@@ -85,12 +85,16 @@ export interface DbContact {
   whatsapp: string | null;
   /** URL do perfil do Instagram. */
   instagram: string | null;
+  /** Site da empresa. */
+  website: string | null;
   /** CNPJ da empresa do contato. */
   cnpj: string | null;
   /** Endereço completo. */
   address: string | null;
   /** Score de prospecção (0-100). */
   score: number | null;
+  /** Lista de sócios separados por vírgula. */
+  socios: string | null;
 }
 
 /**
@@ -146,9 +150,11 @@ const transformContact = (db: DbContact): Contact => ({
   aiPaused: db.ai_paused ?? false,
   whatsapp: db.whatsapp || undefined,
   instagram: db.instagram || undefined,
+  website: db.website || undefined,
   cnpj: db.cnpj || undefined,
   address: db.address || undefined,
   score: db.score ?? undefined,
+  socios: db.socios || undefined,
 });
 
 /**
@@ -198,9 +204,11 @@ const transformContactToDb = (contact: Partial<Contact>): Partial<DbContact> => 
   if (contact.aiPaused !== undefined) db.ai_paused = contact.aiPaused;
   if (contact.whatsapp !== undefined) db.whatsapp = contact.whatsapp || null;
   if (contact.instagram !== undefined) db.instagram = contact.instagram || null;
+  if (contact.website !== undefined) db.website = contact.website || null;
   if (contact.cnpj !== undefined) db.cnpj = contact.cnpj || null;
   if (contact.address !== undefined) db.address = contact.address || null;
   if (contact.score !== undefined) db.score = contact.score ?? null;
+  if (contact.socios !== undefined) db.socios = contact.socios || null;
 
   return db;
 };
@@ -460,9 +468,11 @@ export const contactsService = {
         total_value: sanitizeNumber(contact.totalValue, 0),
         whatsapp: sanitizeText(contact.whatsapp),
         instagram: sanitizeText(contact.instagram),
+        website: sanitizeText(contact.website),
         cnpj: sanitizeText(contact.cnpj),
         address: sanitizeText(contact.address),
         score: contact.score ?? null,
+        socios: sanitizeText(contact.socios),
         ...(organizationId ? { organization_id: organizationId } : {}),
       };
 

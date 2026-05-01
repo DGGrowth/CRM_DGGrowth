@@ -13,9 +13,11 @@ interface ContactFormData {
   companyName: string;
   whatsapp?: string;
   instagram?: string;
+  website?: string;
   cnpj?: string;
   address?: string;
   score?: number;
+  socios?: string;
 }
 
 interface ContactFormModalProps {
@@ -211,6 +213,17 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Website</label>
+            <input
+              type="text"
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="https://clinica.com.br"
+              value={formData.website || ''}
+              onChange={e => setFormData({ ...formData, website: e.target.value })}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CNPJ</label>
@@ -244,6 +257,17 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
               placeholder="Rua, número - Bairro, Cidade - UF"
               value={formData.address || ''}
               onChange={e => setFormData({ ...formData, address: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sócios</label>
+            <input
+              type="text"
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="Nome Sócio 1, Nome Sócio 2"
+              value={formData.socios || ''}
+              onChange={e => setFormData({ ...formData, socios: e.target.value })}
             />
           </div>
 

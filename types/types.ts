@@ -172,9 +172,11 @@ export interface Contact {
   // Campos de prospecção
   whatsapp?: string; // Número ou URL do WhatsApp
   instagram?: string; // URL do perfil do Instagram
+  website?: string; // Site da empresa
   cnpj?: string; // CNPJ da empresa
   address?: string; // Endereço completo
   score?: number; // Score de prospecção (0-100)
+  socios?: string; // Lista de sócios (separados por vírgula)
 
   // @deprecated - Use clientCompanyId instead
   companyId?: string;
