@@ -161,6 +161,13 @@ export const useContactsController = () => {
     phone: '',
     role: '',
     companyName: '',
+    whatsapp: '',
+    instagram: '',
+    website: '',
+    cnpj: '',
+    address: '',
+    score: undefined as number | undefined,
+    socios: '',
   });
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
 
@@ -177,19 +184,26 @@ export const useContactsController = () => {
       return;
     }
     setEditingContact(null);
-    setFormData({ name: '', email: '', phone: '', role: '', companyName: '' });
+    setFormData({ name: '', email: '', phone: '', role: '', companyName: '', whatsapp: '', instagram: '', website: '', cnpj: '', address: '', score: undefined, socios: '' });
     setIsModalOpen(true);
   };
 
   const openEditModal = (contact: Contact) => {
     setEditingContact(contact);
-    const company = companies.find(c => c.id === contact.companyId);
+    const company = companies.find(c => c.id === contact.companyId || c.id === contact.clientCompanyId);
     setFormData({
       name: contact.name,
       email: contact.email,
       phone: contact.phone,
       role: contact.role || '',
       companyName: company?.name || '',
+      whatsapp: contact.whatsapp || '',
+      instagram: contact.instagram || '',
+      website: contact.website || '',
+      cnpj: contact.cnpj || '',
+      address: contact.address || '',
+      score: contact.score,
+      socios: contact.socios || '',
     });
     setIsModalOpen(true);
   };
@@ -420,6 +434,13 @@ export const useContactsController = () => {
             phone: normalizedPhone,
             role: formData.role,
             companyId: companyId,
+            whatsapp: formData.whatsapp || undefined,
+            instagram: formData.instagram || undefined,
+            website: formData.website || undefined,
+            cnpj: formData.cnpj || undefined,
+            address: formData.address || undefined,
+            score: formData.score,
+            socios: formData.socios || undefined,
           },
         },
         {
@@ -441,6 +462,13 @@ export const useContactsController = () => {
           status: 'ACTIVE',
           stage: ContactStage.LEAD,
           totalValue: 0,
+          whatsapp: formData.whatsapp || undefined,
+          instagram: formData.instagram || undefined,
+          website: formData.website || undefined,
+          cnpj: formData.cnpj || undefined,
+          address: formData.address || undefined,
+          score: formData.score,
+          socios: formData.socios || undefined,
         },
         {
           onSuccess: () => {
