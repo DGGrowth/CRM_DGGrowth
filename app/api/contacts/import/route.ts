@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { detectCsvDelimiter, parseCsv, type CsvDelimiter } from '@/lib/utils/csv';
+import { parseUploadedFile } from '@/lib/utils/fileParser';
 import { normalizePhoneE164 } from '@/lib/phone';
 
 export const maxDuration = 120;
@@ -141,18 +142,38 @@ export async function POST(req: Request) {
     const mode: ImportMode = modeResult.data;
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Arquivo CSV não enviado (field "file").' }, { status: 400 });
+      return NextResponse.json({ error: 'Arquivo não enviado (field "file").' }, { status: 400 });
     }
 
-    const text = await file.text();
-    const delimiter: CsvDelimiter =
-      delimiterRaw === ',' || delimiterRaw === ';' || delimiterRaw === '\t'
-        ? (delimiterRaw as CsvDelimiter)
-        : detectCsvDelimiter(text);
+    // Detectar formato e parsear
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isCsvLike = ['csv', 'tsv', 'txt', ''].includes(ext);
 
-    const { headers, rows } = parseCsv(text, delimiter);
+    let headers: string[];
+    let rows: string[][];
+    let detectedFormat: string;
+
+    if (isCsvLike) {
+      // CSV: respeitar delimitador manual se informado
+      const text = await file.text();
+      const delimiter: CsvDelimiter =
+        delimiterRaw === ',' || delimiterRaw === ';' || delimiterRaw === '\t'
+          ? (delimiterRaw as CsvDelimiter)
+          : detectCsvDelimiter(text);
+      const parsed = parseCsv(text, delimiter);
+      headers = parsed.headers;
+      rows = parsed.rows;
+      detectedFormat = 'csv';
+    } else {
+      // XLSX, XLS, ODS, PDF, JSON, etc.
+      const parsed = await parseUploadedFile(file);
+      headers = parsed.headers;
+      rows = parsed.rows;
+      detectedFormat = parsed.format;
+    }
+
     if (!headers.length) {
-      return NextResponse.json({ error: 'CSV sem cabeçalho.' }, { status: 400 });
+      return NextResponse.json({ error: 'Arquivo sem cabeçalho ou formato não reconhecido.' }, { status: 400 });
     }
 
     const mapping = buildHeaderIndex(headers);
@@ -405,7 +426,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      delimiter,
+      format: detectedFormat,
       mode,
       totals: {
         rows: rows.length,

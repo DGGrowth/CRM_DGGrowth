@@ -56,6 +56,7 @@
     "lucide-react": "^0.560.0",
     "mcp-handler": "^1.1.0",
     "next": "^16.2.2",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -66,6 +67,7 @@
     "resend": "^6.10.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
@@ -75,6 +77,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.19.39",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.2.0",
