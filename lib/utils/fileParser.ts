@@ -31,7 +31,8 @@ async function parseXlsx(buffer: ArrayBuffer, format: string): Promise<ParsedFil
 }
 
 async function parsePdf(buffer: ArrayBuffer): Promise<ParsedFile> {
-  const pdfParse = (await import('pdf-parse')).default;
+  const pdfParseModule = await import('pdf-parse');
+  const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
   const result = await pdfParse(Buffer.from(buffer));
   const lines = result.text
     .split('\n')
