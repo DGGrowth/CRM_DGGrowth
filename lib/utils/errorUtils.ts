@@ -28,6 +28,7 @@ export const getErrorMessage = (error: unknown): string => {
         'Auth session missing!': 'Sessão expirada. Por favor, faça login novamente.',
         'User already registered': 'Este email já está cadastrado.',
         'Rate limit exceeded': 'Muitas tentativas. Por favor, aguarde um momento.',
+        'Failed to fetch': 'Não foi possível conectar ao servidor. Verifique se o projeto Supabase está ativo e as variáveis de ambiente na Vercel estão corretas.',
     };
 
     // Verificação exata

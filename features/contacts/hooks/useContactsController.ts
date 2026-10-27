@@ -155,7 +155,20 @@ export const useContactsController = () => {
   const [deleteCompanyId, setDeleteCompanyId] = useState<string | null>(null);
   const [deleteWithDeals, setDeleteWithDeals] = useState<{ id: string; dealCount: number; deals: Array<{ id: string; title: string }> } | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    companyName: string;
+    whatsapp?: string;
+    instagram?: string;
+    website?: string;
+    cnpj?: string;
+    address?: string;
+    score?: number;
+    socios?: string;
+  }>({
     name: '',
     email: '',
     phone: '',
@@ -166,7 +179,7 @@ export const useContactsController = () => {
     website: '',
     cnpj: '',
     address: '',
-    score: undefined as number | undefined,
+    score: undefined,
     socios: '',
   });
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
