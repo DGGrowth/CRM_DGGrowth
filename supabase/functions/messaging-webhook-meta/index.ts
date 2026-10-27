@@ -992,8 +992,9 @@ async function autoCreateDeal(
         contact_id: params.contactId,
         title: dealTitle,
         value: 0,
-        source: source,
-        metadata: {
+        // deals não tem colunas source/metadata: os dados de origem ficam em custom_fields
+        custom_fields: {
+          source: source,
           auto_created: true,
           created_from: "messaging_webhook",
           conversation_id: params.conversationId,
@@ -1014,9 +1015,8 @@ async function autoCreateDeal(
     await supabase.from("deal_activities").insert({
       deal_id: newDeal.id,
       organization_id: params.organizationId,
-      activity_type: "note",
-      title: `Lead criado automaticamente via ${sourceLabel}`,
-      description: `Este negócio foi criado automaticamente quando ${params.contactName} enviou uma mensagem pelo ${sourceLabel}. Nenhuma ação manual foi necessária.`,
+      type: "note",
+      description: `Lead criado automaticamente via ${sourceLabel}. Este negócio foi criado automaticamente quando ${params.contactName} enviou uma mensagem pelo ${sourceLabel}. Nenhuma ação manual foi necessária.`,
       metadata: {
         auto_created: true,
         source: params.source || "whatsapp",
