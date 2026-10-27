@@ -886,7 +886,7 @@ async function handleInboundMessage(
   }
 
   // Insert message
-  const { error: msgErr } = await supabase.from("messaging_messages").insert({
+  const { data: insertedMsg, error: msgErr } = await supabase.from("messaging_messages").insert({
     conversation_id: conversationId,
     external_id: externalMessageId,
     direction: "inbound",
@@ -901,7 +901,7 @@ async function handleInboundMessage(
       timestamp: message.timestamp,
       context: message.context,
     },
-  });
+  }).select("id").maybeSingle();
 
   if (msgErr) {
     // Ignore duplicate messages
@@ -932,7 +932,7 @@ async function handleInboundMessage(
       conversationId,
       organizationId: channel.organization_id,
       messageText: content.text,
-      messageId: externalMessageId,
+      messageId: insertedMsg?.id,
     }).catch((err) => {
       // Log but don't fail the webhook
       console.error("[Webhook] AI processing trigger error:", err);
@@ -1011,7 +1011,6 @@ async function autoCreateDeal(
     console.log(`[Webhook] Auto-created deal: ${newDeal.id} for contact ${params.contactId}`);
 
     // Registrar activity para o usuário entender que o lead veio do canal de mensagens
-    const sourceLabel = (params.source || "whatsapp") === "instagram" ? "Instagram" : "WhatsApp";
     await supabase.from("deal_activities").insert({
       deal_id: newDeal.id,
       organization_id: params.organizationId,
@@ -1417,7 +1416,7 @@ async function handleInstagramInboundMessage(
   }
 
   // Insert message
-  const { error: msgErr } = await supabase.from("messaging_messages").insert({
+  const { data: insertedMsg, error: msgErr } = await supabase.from("messaging_messages").insert({
     conversation_id: conversationId,
     external_id: externalMessageId,
     direction: "inbound",
@@ -1429,7 +1428,7 @@ async function handleInstagramInboundMessage(
       instagram_mid: message.mid,
       timestamp: event.timestamp,
     },
-  });
+  }).select("id").maybeSingle();
 
   if (msgErr) {
     if (!msgErr.message.toLowerCase().includes("duplicate")) {
@@ -1455,7 +1454,7 @@ async function handleInstagramInboundMessage(
       conversationId,
       organizationId: channel.organization_id,
       messageText: content.text,
-      messageId: externalMessageId,
+      messageId: insertedMsg?.id,
     }).catch((err) => {
       // Log but don't fail the webhook
       console.error("[Webhook/IG] AI processing trigger error:", err);
