@@ -19,8 +19,7 @@ Este repositório é **público**: nunca commitar tokens, App Secret, chaves ou 
 - **Supabase**: Postgres + edge functions. Edge functions são publicadas pelo editor do painel
   (não há CLI configurada); depois de mudar `supabase/functions/*`, publicar no painel.
   `messaging-webhook-meta` roda **com verificação de JWT desligada**.
-- **Branch `criativos`** (órfã): imagens públicas usadas em anúncios e Instagram
-  (`dg-growth/`, `instagram/`), servidas via `raw.githubusercontent.com`.
+- **Branch `criativos`** (órfã): imagens antigas de anúncios (`dg-growth/`). As do Instagram agora ficam no repo `instagram-autopost`.
 
 ## 1. WhatsApp + agente de IA (funcionando)
 Fluxo: Meta WhatsApp Cloud API → `supabase/functions/messaging-webhook-meta` → cria contato,
@@ -40,20 +39,10 @@ conversa e negócio (etapa "Novo lead") → `POST /api/messaging/ai/process` →
   negócio automático usa `custom_fields` (não existe `deals.source/metadata`),
   `deal_activities` usa `type/description/metadata`, migração `contacts.metadata`.
 
-## 2. Instagram orgânico automático (funcionando)
-- Tabelas: `instagram_posts` (fila) e `instagram_autopost_config` (linha única: `ig_user_id`,
-  `access_token`, `enabled`, `trigger_key`). Migração `20261028000000_instagram_autopost.sql`.
-- Rota `app/api/cron/instagram-autopost/route.ts`: publica **1 post vencido por execução**
-  (container → status → `media_publish`), até 3 tentativas, erro gravado na linha.
-- Cron Vercel `15 0 * * *` UTC = **21:15 Brasília**. Disparo manual:
-  `https://crm-dg-growth.vercel.app/api/cron/instagram-autopost?key=<trigger_key>`
-  (a chave está na tabela de config; não colocar aqui).
-- Conta IG **@dggrowth** id `17841455803827460`; token do usuário do sistema no app **Ap postagens**.
-- Imagens: JPEG 1080×1350 em `criativos:instagram/post-NN.jpg`. Lote 1 = 12 posts
-  (seg/qua/sex, 27/10 a 23/11/2026); o 1º já foi publicado. Para um novo lote: gerar JPEGs,
-  subir na branch `criativos`, inserir linhas em `instagram_posts` com `scheduled_at` às 21:15-03.
-- Identidade visual: fundo `#0E1116`, texto `#F2F1EC`, destaque `#C6F432`, cartões `#1A1F27`,
-  títulos Space Grotesk 700, corpo Inter.
+## 2. Instagram orgânico automático (projeto separado)
+Não faz mais parte do CRM. Vive em https://github.com/DGGrowth/instagram-autopost
+(Vercel `instagram-autopost`, banco Firestore no projeto GCP `dg-ig-autopost`).
+O CRM não compartilha código, banco nem credenciais com ele.
 
 ## 3. Meta Ads
 - Conta de anúncios **CTA-DGGrowth** `861163187945684` (BM DGGrowth `152108020129648`).
@@ -67,6 +56,3 @@ conversa e negócio (etapa "Novo lead") → `POST /api/messaging/ai/process` →
 3. Ativar faturamento do Gemini (Google AI Studio) para estabilidade; depois testar modelo maior.
 4. Aviso de lead qualificado para o Carlos: Telegram (já suportado no CRM) ou WhatsApp (exige código).
 5. Ajustes finos do agente que a UI não expõe (palavras de handoff, delay, máx. mensagens) via SQL.
-
-## Ferramentas no repositório
-- `scripts/instagram/`: gerador dos posts (conteúdo em `posts.py`, render com Playwright).
