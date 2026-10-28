@@ -12,7 +12,10 @@ function json<T>(body: T, status = 200): Response {
   });
 }
 
-function authorized(req: Request): boolean {
+function authorized(req: Request, triggerKey?: string | null): boolean {
+  // Disparo manual: /api/cron/instagram-autopost?key=<trigger_key da config>
+  const key = new URL(req.url).searchParams.get('key');
+  if (key && triggerKey && key === triggerKey) return true;
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) return req.headers.get('Authorization') === `Bearer ${cronSecret}`;
   // Sem CRON_SECRET configurado: aceita apenas o agendador da Vercel.
@@ -42,15 +45,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * (um por execução). Configuração em `instagram_autopost_config`.
  */
 export async function GET(req: Request) {
-  if (!authorized(req)) return json({ error: 'Unauthorized' }, 401);
-
   const supabase = createStaticAdminClient();
 
   const { data: config } = await supabase
     .from('instagram_autopost_config')
-    .select('ig_user_id, access_token, enabled')
+    .select('ig_user_id, access_token, enabled, trigger_key')
     .eq('id', 1)
     .maybeSingle();
+
+  if (!authorized(req, config?.trigger_key)) return json({ error: 'Unauthorized' }, 401);
 
   if (!config?.enabled) return json({ skipped: 'autopost desativado ou sem configuração' });
 
