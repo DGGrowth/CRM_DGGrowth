@@ -201,6 +201,94 @@ function extractMessageContent(data: EvolutionMessageData): { contentType: strin
   }
 }
 
+// Tipos que indicam uma pessoa digitando/enviando no app. Reações, protocolo
+// (apagar/editar) e tipos desconhecidos não devem pausar a IA.
+const HUMAN_MESSAGE_TYPES = new Set([
+  "conversation",
+  "extendedTextMessage",
+  "imageMessage",
+  "audioMessage",
+  "videoMessage",
+  "documentMessage",
+  "stickerMessage",
+  "locationMessage",
+]);
+
+// A Evolution devolve como fromMe tudo que sai pela API, inclusive o que o CRM
+// envia. O CRM grava a linha como "pending" sem external_id e só preenche depois
+// do envio; se o webhook chegar antes, tenta assumir essa linha.
+const CRM_SEND_WINDOW_MS = 90_000;
+
+/**
+ * Retorna true quando o fromMe corresponde a uma mensagem enviada pelo CRM
+ * (já associada ou associada agora), false quando veio do app do celular.
+ */
+async function claimCrmSentMessage(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string,
+  externalMessageId: string
+): Promise<boolean> {
+  // Já associada pelo CRM: external_id existe (índice único é global)
+  const { data: already } = await supabase
+    .from("messaging_messages")
+    .select("id")
+    .eq("external_id", externalMessageId)
+    .maybeSingle();
+  if (already) return true;
+
+  const since = new Date(Date.now() - CRM_SEND_WINDOW_MS).toISOString();
+  const { data: pending } = await supabase
+    .from("messaging_messages")
+    .select("id")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "outbound")
+    .in("sender_type", ["ai", "user"])
+    .is("external_id", null)
+    .in("status", ["pending", "sent"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!pending) return false;
+
+  // .is(external_id, null) evita duas execuções assumirem a mesma linha
+  const { data: claimed, error } = await supabase
+    .from("messaging_messages")
+    .update({ external_id: externalMessageId })
+    .eq("id", pending.id)
+    .is("external_id", null)
+    .select("id");
+  if (error) {
+    console.error("[Evolution] Failed to claim CRM-sent message:", error);
+    return false;
+  }
+  return (claimed?.length ?? 0) > 0;
+}
+
+async function pauseAIForHumanReply(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string
+) {
+  const { data: conv } = await supabase
+    .from("messaging_conversations")
+    .select("metadata")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("messaging_conversations")
+    .update({
+      metadata: {
+        ...((conv?.metadata as Record<string, unknown>) ?? {}),
+        ai_paused: true,
+        ai_paused_reason: "human_reply_whatsapp_app",
+        ai_paused_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", conversationId);
+  if (error) console.error("[Evolution] Failed to pause AI:", error);
+}
+
 /**
  * Map Evolution API numeric status to internal string status.
  * 3 → sent, 4 → delivered, 5 → read
@@ -497,6 +585,20 @@ async function handleMessagesUpsert(
     }
   }
 
+  // Eco de uma mensagem que o próprio CRM enviou (IA ou operador pela UI):
+  // associa o external_id à linha existente em vez de criar outra, e não pausa a IA.
+  if (isFromMe && (await claimCrmSentMessage(supabase, conversationId, externalMessageId))) {
+    await supabase
+      .from("messaging_conversations")
+      .update({
+        last_message_at: timestamp.toISOString(),
+        last_message_preview: messageText.slice(0, 100),
+        last_message_direction: direction,
+      })
+      .eq("id", conversationId);
+    return;
+  }
+
   // Insert message (inbound or outbound from WhatsApp app)
   // Preserve real content type instead of always saving as 'text'
   const { data: insertedMsg, error: msgErr } = await supabase
@@ -542,6 +644,11 @@ async function handleMessagesUpsert(
 
   if (convUpdateErr) {
     console.error("[Evolution] Failed to update conversation:", convUpdateErr, { conversationId });
+  }
+
+  // Pessoa respondeu pelo app do celular: pausa a IA nesta conversa
+  if (isFromMe && HUMAN_MESSAGE_TYPES.has(data.messageType ?? "")) {
+    await pauseAIForHumanReply(supabase, conversationId);
   }
 
   // Only trigger AI for inbound text messages
