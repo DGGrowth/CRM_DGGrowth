@@ -13,8 +13,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { processIncomingMessage } from '@/lib/ai/agent';
+import { getOrgAIConfig } from '@/lib/ai/agent/agent.service';
+import { transcribeAudio } from '@/lib/ai/agent/transcribe-audio';
 import crypto from 'crypto';
 
 // Internal API secret for webhook -> AI communication
@@ -58,7 +60,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { conversationId, organizationId, messageId, messageText } = body;
+  const { conversationId, organizationId, messageId, messageText, audio } = body;
+  const hasAudio =
+    audio && typeof audio.base64 === 'string' && typeof audio.mimeType === 'string';
 
   // Validate required fields and UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -97,13 +101,26 @@ export async function POST(request: NextRequest) {
   // In dev, waitUntil drops the callback — await directly for testability.
   // In production, Vercel executes waitUntil after the response is sent.
   const isDev = process.env.NODE_ENV === 'development';
-  const task = processIncomingMessage({
-    supabase,
-    conversationId,
-    organizationId,
-    incomingMessage: messageText,
-    messageId,
-  }).catch((error) => {
+  const task = (async () => {
+    let incomingMessage: string = messageText;
+
+    if (hasAudio) {
+      incomingMessage = await resolveAudioMessage({
+        supabase,
+        organizationId,
+        messageId,
+        audio,
+      });
+    }
+
+    await processIncomingMessage({
+      supabase,
+      conversationId,
+      organizationId,
+      incomingMessage,
+      messageId,
+    });
+  })().catch((error) => {
     console.error('[AI Process] Background processing error:', error);
   });
 
@@ -114,4 +131,44 @@ export async function POST(request: NextRequest) {
   }
 
   return Response.json({ received: true }, { status: 200 });
+}
+
+/**
+ * Transcreve o áudio do cliente, guarda a transcrição na mensagem e devolve o
+ * texto que o agente deve tratar como a mensagem recebida.
+ */
+async function resolveAudioMessage(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  messageId?: string;
+  audio: { base64: string; mimeType: string };
+}): Promise<string> {
+  const { supabase, organizationId, messageId, audio } = params;
+
+  const aiConfig = await getOrgAIConfig(supabase, organizationId);
+  const transcript = aiConfig
+    ? await transcribeAudio({ aiConfig, base64: audio.base64, mimeType: audio.mimeType })
+    : null;
+
+  if (!transcript) {
+    return '[O cliente enviou um áudio que não foi possível ouvir. Peça com gentileza que ele escreva a mensagem.]';
+  }
+
+  if (messageId) {
+    const { data: msg } = await supabase
+      .from('messaging_messages')
+      .select('content')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    const { error } = await supabase
+      .from('messaging_messages')
+      .update({
+        content: { ...((msg?.content as Record<string, unknown>) ?? { type: 'audio' }), transcription: transcript },
+      })
+      .eq('id', messageId);
+    if (error) console.error('[AI Process] Failed to save audio transcription:', error);
+  }
+
+  return `[Áudio transcrito] ${transcript}`;
 }
