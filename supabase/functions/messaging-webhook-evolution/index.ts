@@ -40,6 +40,8 @@ interface EvolutionMessageContent {
   documentMessage?: { fileName?: string };
   stickerMessage?: Record<string, unknown>;
   locationMessage?: { degreesLatitude?: number; degreesLongitude?: number };
+  /** Mídia em base64, enviada quando o webhook da instância tem base64 ligado. */
+  base64?: string;
 }
 
 interface EvolutionMessageData {
@@ -674,7 +676,11 @@ async function handleMessagesUpsert(
 
   // Áudio do cliente: baixa da Evolution e manda para o CRM transcrever e responder
   if (!isFromMe && contentType === "audio" && insertedMsg?.id) {
-    const audio = await fetchEvolutionAudio(channel.credentials, externalMessageId);
+    // A Evolution não guarda mensagens no banco, então o áudio só vem no próprio webhook
+    // (base64 ligado na instância); buscar depois pela API devolve "Message not found".
+    const audio =
+      extractInlineAudio(data.message) ??
+      (await fetchEvolutionAudio(channel.credentials, externalMessageId));
     if (audio) {
       triggerAIProcessing({
         conversationId,
@@ -692,6 +698,20 @@ async function handleMessagesUpsert(
 // ~2 MB de áudio em base64: cobre mensagens de voz de alguns minutos e fica
 // abaixo do limite de 4,5 MB do corpo das funções da Vercel.
 const MAX_AUDIO_BASE64_LENGTH = 2_800_000;
+
+function extractInlineAudio(
+  message: EvolutionMessageContent | undefined
+): { base64: string; mimeType: string } | null {
+  const base64 = (message?.base64 ?? "").replace(/^data:[^;]+;base64,/, "");
+  if (!base64) return null;
+  if (base64.length > MAX_AUDIO_BASE64_LENGTH) {
+    console.warn("[Evolution] Audio too large, skipping transcription");
+    return null;
+  }
+
+  const rawMime = (message?.audioMessage?.mimetype as string | undefined) ?? "audio/ogg";
+  return { base64, mimeType: rawMime.split(";")[0].trim() || "audio/ogg" };
+}
 
 /**
  * Baixa o áudio de uma mensagem recebida pela API da Evolution.
