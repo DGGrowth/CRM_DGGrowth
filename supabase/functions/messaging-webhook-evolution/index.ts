@@ -311,6 +311,7 @@ async function triggerAIProcessing(params: {
   organizationId: string;
   messageText: string;
   messageId?: string;
+  audio?: { base64: string; mimeType: string };
 }): Promise<void> {
   const appUrl = Deno.env.get("APP_URL") || Deno.env.get("CRM_APP_URL") || "http://localhost:3000";
   const internalSecret = Deno.env.get("INTERNAL_API_SECRET");
@@ -334,6 +335,7 @@ async function triggerAIProcessing(params: {
         organizationId: params.organizationId,
         messageText: params.messageText,
         messageId: params.messageId,
+        ...(params.audio ? { audio: params.audio } : {}),
       }),
     });
 
@@ -464,6 +466,7 @@ async function handleMessagesUpsert(
     organization_id: string;
     business_unit_id: string;
     external_identifier: string;
+    credentials: Record<string, string>;
   },
   payload: EvolutionUpsertPayload
 ) {
@@ -668,6 +671,67 @@ async function handleMessagesUpsert(
       });
     }
   }
+
+  // Áudio do cliente: baixa da Evolution e manda para o CRM transcrever e responder
+  if (!isFromMe && contentType === "audio" && insertedMsg?.id) {
+    const audio = await fetchEvolutionAudio(channel.credentials, externalMessageId);
+    if (audio) {
+      triggerAIProcessing({
+        conversationId,
+        organizationId: channel.organization_id,
+        messageText: "[áudio]",
+        messageId: insertedMsg.id,
+        audio,
+      }).catch((err) => {
+        console.error("[Evolution] AI audio trigger error:", err);
+      });
+    }
+  }
+}
+
+// ~2 MB de áudio em base64: cobre mensagens de voz de alguns minutos e fica
+// abaixo do limite de 4,5 MB do corpo das funções da Vercel.
+const MAX_AUDIO_BASE64_LENGTH = 2_800_000;
+
+/**
+ * Baixa o áudio de uma mensagem recebida pela API da Evolution.
+ * Retorna null em qualquer falha: sem áudio a IA simplesmente não responde.
+ */
+async function fetchEvolutionAudio(
+  credentials: Record<string, string>,
+  messageId: string
+): Promise<{ base64: string; mimeType: string } | null> {
+  const { serverUrl, apiKey, instanceName } = credentials;
+  if (!serverUrl || !apiKey || !instanceName) return null;
+
+  try {
+    const res = await fetch(
+      `${serverUrl}/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: apiKey },
+        body: JSON.stringify({ message: { key: { id: messageId } } }),
+      }
+    );
+    if (!res.ok) {
+      console.error(`[Evolution] Audio download failed: ${res.status}`);
+      return null;
+    }
+
+    const data = (await res.json()) as { base64?: string; mimetype?: string };
+    const base64 = (data.base64 ?? "").replace(/^data:[^;]+;base64,/, "");
+    if (!base64 || base64.length > MAX_AUDIO_BASE64_LENGTH) {
+      console.warn("[Evolution] Audio empty or too large, skipping transcription");
+      return null;
+    }
+
+    // "audio/ogg; codecs=opus" → "audio/ogg"
+    const mimeType = (data.mimetype ?? "audio/ogg").split(";")[0].trim() || "audio/ogg";
+    return { base64, mimeType };
+  } catch (error) {
+    console.error("[Evolution] Audio download error:", error);
+    return null;
+  }
 }
 
 async function handleMessagesUpdate(
@@ -854,25 +918,72 @@ async function autoCreateDeal(
       stageId = firstStage.id;
     }
 
-    const { data: newDeal, error: dealErr } = await supabase
+    // Contato que já tem negócio aberto (o banco bloqueia dois no mesmo estágio):
+    // reaproveita em vez de criar outro, senão a conversa fica sem deal_id e a IA não responde.
+    const { data: existingDeal, error: existingDealErr } = await supabase
       .from("deals")
-      .insert({
-        organization_id: params.organizationId,
-        board_id: params.boardId,
-        stage_id: stageId,
-        contact_id: params.contactId,
-        title: `${params.contactName} - WhatsApp`,
-        value: 0,
-      })
       .select("id")
-      .single();
+      .eq("organization_id", params.organizationId)
+      .eq("contact_id", params.contactId)
+      .eq("is_won", false)
+      .eq("is_lost", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (dealErr) {
-      console.error("[Evolution] Error auto-creating deal:", dealErr);
-      return;
+    if (existingDealErr) {
+      console.error("[Evolution] Error looking up existing deal:", existingDealErr);
     }
 
-    console.log(`[Evolution] Auto-created deal: ${newDeal.id} for contact ${params.contactId}`);
+    let dealId: string;
+    let autoCreated = false;
+
+    if (existingDeal) {
+      dealId = existingDeal.id;
+      console.log(`[Evolution] Reusing open deal: ${dealId} for contact ${params.contactId}`);
+    } else {
+      const { data: newDeal, error: dealErr } = await supabase
+        .from("deals")
+        .insert({
+          organization_id: params.organizationId,
+          board_id: params.boardId,
+          stage_id: stageId,
+          status: stageId, // CRM usa stage_id e status; precisam ser iguais
+          contact_id: params.contactId,
+          title: `${params.contactName} - WhatsApp`,
+          value: 0,
+          // deals não tem colunas source/metadata: a origem fica em custom_fields
+          custom_fields: {
+            source: "whatsapp",
+            auto_created: true,
+            created_from: "messaging_webhook",
+            conversation_id: params.conversationId,
+          },
+        })
+        .select("id")
+        .single();
+
+      if (dealErr) {
+        console.error("[Evolution] Error auto-creating deal:", dealErr);
+        return;
+      }
+
+      dealId = newDeal.id;
+      autoCreated = true;
+      console.log(`[Evolution] Auto-created deal: ${dealId} for contact ${params.contactId}`);
+
+      await supabase.from("deal_activities").insert({
+        deal_id: dealId,
+        organization_id: params.organizationId,
+        type: "note",
+        description: `Lead criado automaticamente via WhatsApp. Este negócio foi criado automaticamente quando ${params.contactName} enviou uma mensagem pelo WhatsApp. Nenhuma ação manual foi necessária.`,
+        metadata: {
+          auto_created: true,
+          source: "whatsapp",
+          conversation_id: params.conversationId,
+        },
+      });
+    }
 
     // Update conversation metadata with deal reference — abort on read error
     // to avoid wiping existing JSONB data with a bad merge.
@@ -893,8 +1004,8 @@ async function autoCreateDeal(
       .update({
         metadata: {
           ...((conv?.metadata as Record<string, unknown>) || {}),
-          deal_id: newDeal.id,
-          auto_created_deal: true,
+          deal_id: dealId,
+          ...(autoCreated ? { auto_created_deal: true } : {}),
         },
       })
       .eq("id", params.conversationId);
