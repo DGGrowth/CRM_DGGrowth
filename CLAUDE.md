@@ -70,7 +70,7 @@ O Carlos continua respondendo pelo celular no mesmo número; a IA atende site e 
     (`lib/ai/agent/transcribe-audio.ts`), salva `content.transcription` e o agente responde ao texto.
 - Segurança: WAF da Cloudflare bloqueia `/manager`; SSH só via IAP; orçamento de R$ 10/mês com alerta.
 - Testado em produção: texto, áudio, pausa por resposta humana, reinício da VM (sessão reconecta sozinha).
-  **Não testado:** contato totalmente novo (número que nunca falou com o CRM).
+  Contato totalmente novo (número que nunca falou com o CRM): testado pelo Carlos em 03/11/2026.
 - Risco inerente da API não oficial: banimento. Evitar disparos em massa e mensagens a quem não escreveu primeiro.
 - PRs: #6 (pausa por humano), #7 (negócio existente + áudio), #8 (sincroniza áudio via base64). Todos mergeados.
 
@@ -85,7 +85,7 @@ O CRM não compartilha código, banco nem credenciais com ele.
   **pausada de propósito**; o Carlos a reativa manualmente (o número agora é o real, via Evolution).
 
 ## Pendências
-1. **Testar contato novo** (número que nunca falou com o CRM) antes de reativar os anúncios.
+1. ~~Testar contato novo~~ — feito em 03/11/2026; anúncios podem ser reativados pelo Carlos.
 2. Trocar o **App Secret** do app Meta (foi exposto); só relevante se voltar ao canal oficial
    (senão, desativar o canal antigo `e7ea38c6-…`).
 2b. Erro não fatal: `ai_conversation_log.context_snapshot` nulo ao registrar tokens.
