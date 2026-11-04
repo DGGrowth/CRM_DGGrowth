@@ -7,7 +7,8 @@ Dono: Carlos Dias (Brasil, America/Sao_Paulo). Responda sempre em **português**
 Este repositório é **público**: nunca commitar tokens, App Secret, chaves ou senhas.
 
 ## O negócio
-- DG Growth vende implantação de IA (atendimento, vendas, operação).
+- DG Growth vende implantação de IA (atendimento, vendas, operação) e, desde 04/11/2026, também **Marketing & Growth**
+  (tráfego pago, social media, sites/landing pages, estratégia de growth). Ver seção 1c.
 - Porta de entrada: **Diagnóstico de IA — 30 min, R$ 130 (Pix)**. Projetos a partir de R$ 2.500.
 - Público: fábricas e negócios que faturam **mais de R$ 70 mil/mês**, foco em São Paulo capital.
 - Roteiros completos do agente SDR/Closer, objeções e decisões: Claude Doc
@@ -31,6 +32,9 @@ conversa e negócio (etapa "Novo lead") → `POST /api/messaging/ai/process` →
   (a UI do CRM não edita credenciais; atualizar via SQL com `jsonb_set`).
 - IA: Gemini, modelo em `organization_settings.ai_model` = `gemini-3.5-flash-lite`
   (modelos maiores deram 503 "high demand" no plano gratuito e estouraram os 60s da Vercel).
+- **Duas frentes (desde 04/11/2026)**: IA e Marketing & Growth (tráfego pago, social media/criativos, sites/LPs, growth).
+  Fase 1 = um funil só; o SDR faz a triagem no prompt. Marketing: corte de R$ 2.500/mês (gestão R$ 800–1.000 + verba ~R$ 1.500),
+  porta de entrada = reunião estratégica gratuita de 30 min. Prompts em `supabase/manual/20261104_agente_dois_segmentos.sql`.
 - Agentes por etapa em `stage_ai_config`: **Novo lead = SDR** (qualifica segmento, faturamento,
   dor, urgência, decisor) e **Qualificado = Closer** (agenda Diagnóstico, cobra Pix, pede e-mail).
   Atenção: ligar/desligar a IA da etapa pela UI **sobrescreve o prompt com o padrão** — reaplicar.
@@ -74,6 +78,29 @@ O Carlos continua respondendo pelo celular no mesmo número; a IA atende site e 
 - Risco inerente da API não oficial: banimento. Evitar disparos em massa e mensagens a quem não escreveu primeiro.
 - PRs: #6 (pausa por humano), #7 (negócio existente + áudio), #8 (sincroniza áudio via base64). Todos mergeados.
 
+### 1c. Agente SDR/Closer com duas frentes: IA e Marketing & Growth (no ar desde 04/11/2026)
+Fase 1: **um funil só**; a triagem entre as frentes fica no prompt do SDR. Sem mudança de código, funis ou etapas.
+- Fonte dos textos: `supabase/manual/20261104_agente_dois_segmentos.sql` (rodar de novo se alguém ligar/desligar
+  a IA da etapa pela UI, que sobrescreve o prompt). Aplicado por SQL no board `0e9b00f7-…` (etapas Novo lead e Qualificado).
+- **IA**: faturamento > R$ 70 mil/mês; Diagnóstico de IA 30 min, R$ 130 via Pix (abatido se fechar em 30 dias).
+- **Marketing**: investimento mínimo R$ 2.500/mês (gestão R$ 800–1.000 + verba de anúncios a partir de ~R$ 1.500, paga ao
+  Google/Meta). O SDR ancora o valor ANTES de oferecer a reunião; o Closer reconfirma uma vez. Porta de entrada:
+  reunião estratégica **gratuita** de 30 min, sem Pix. Lead de IA abaixo de R$ 70 mil é perguntado se quer a trilha de Marketing.
+  Lead sem perfil (inclusive Marketing abaixo de R$ 2.500/mês): encerrar com educação, sem desconto.
+- Horários fixos (Brasília): ter e qua 10h/14h/16h; qui 10h. Sem emojis em nenhuma mensagem (decisão do Carlos).
+- Settings atuais: handoff `falar com humano`, `atendente`, `pessoa real`; delay 20s; **max_messages SDR 16 e Closer 30**.
+  **Armadilha:** `max_messages_per_conversation` conta TODAS as mensagens da IA na conversa (`agent.service.ts:408`), não por etapa.
+  O Closer com 8 dava handoff imediato ("Limite de mensagens atingido") ao receber o lead; por isso o limite do Closer
+  precisa ser maior que o do SDR.
+- Critérios de avanço valem para as duas frentes (o `stage-evaluator` exige todos `met=true`); não criar critérios por frente.
+- **Testes de 04/11 (WhatsApp real):** perfil Marketing aprovado de ponta a ponta (triagem, âncora de orçamento, horário,
+  reconfirmação, e-mail; negócio foi para "Diagnóstico agendado"; nenhum emoji, nenhum Pix).
+  **Falta testar:** (1) fábrica de IA com R$ 400 mil/mês → Diagnóstico e Pix; (3) loja com R$ 800/mês de anúncios →
+  encerramento educado; (4) empresa faturando R$ 50 mil/mês → oferta da trilha de Marketing.
+  Também falta testar handoff por "quero falar com um atendente" e a primeira mensagem vaga (pergunta de triagem).
+- Limitação conhecida: depois de "Diagnóstico agendado" não há IA; mensagens do lead (ex.: link do Instagram) ficam sem
+  resposta e o Carlos não é avisado (ver pendência 4). Lead de Marketing cai numa etapa com nome da frente de IA (fase 2).
+
 ## 2. Instagram orgânico automático (projeto separado)
 Não faz mais parte do CRM. Vive em https://github.com/DGGrowth/instagram-autopost
 (Vercel `instagram-autopost`, banco Firestore no projeto GCP `dg-ig-autopost`).
@@ -92,4 +119,10 @@ O CRM não compartilha código, banco nem credenciais com ele.
 2c. Monitorar o tamanho do schema `evolution` no Supabase (free ~500 MB; mensagens agora são salvas).
 3. Ativar faturamento do Gemini (Google AI Studio) para estabilidade; depois testar modelo maior.
 4. Aviso de lead qualificado para o Carlos: Telegram (já suportado no CRM) ou WhatsApp (exige código).
+4b. Fase 2 das duas frentes: dois funis (IA e Marketing). O `stage-evaluator` só avança para a próxima etapa do mesmo funil;
+   precisa rotear o negócio para o funil da frente identificada (e etiquetar o segmento).
+4c. **Amanhã (05/11):** terminar os testes da seção 1c (perfis 1, 3 e 4, handoff e triagem) com números diferentes e
+   ler as conversas no banco (`messaging_messages`, `ai_conversation_log`). A conversa de teste da Vivian
+   (`6993009d-…`, deal `55dfeb78-…`) ficou em "Diagnóstico agendado" e pode ser apagada. Decidir se commita
+   `supabase/manual/20261104_agente_dois_segmentos.sql` (já com emoji e handoff corrigidos; já com max_messages 16/30).
 5. Ajustes finos do agente que a UI não expõe (palavras de handoff, delay, máx. mensagens) via SQL.
