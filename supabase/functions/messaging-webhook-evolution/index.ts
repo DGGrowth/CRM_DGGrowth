@@ -31,9 +31,23 @@ interface EvolutionMessageKey {
   fromMe: boolean;
 }
 
+/** Dados de anúncio "Click to WhatsApp" (só vêm quando a Meta/WhatsApp os repassam). */
+interface EvolutionContextInfo {
+  externalAdReply?: {
+    title?: string;
+    body?: string;
+    sourceId?: string;
+    sourceUrl?: string;
+    sourceType?: string;
+    ctwaClid?: string;
+  };
+  entryPointConversionSource?: string;
+  entryPointConversionApp?: string;
+}
+
 interface EvolutionMessageContent {
   conversation?: string;
-  extendedTextMessage?: { text?: string };
+  extendedTextMessage?: { text?: string; contextInfo?: EvolutionContextInfo };
   imageMessage?: { caption?: string };
   audioMessage?: Record<string, unknown>;
   videoMessage?: { caption?: string };
@@ -51,6 +65,7 @@ interface EvolutionMessageData {
   message?: EvolutionMessageContent;
   messageType?: string;
   messageTimestamp?: number;
+  contextInfo?: EvolutionContextInfo;
 }
 
 interface EvolutionUpdateData {
@@ -157,6 +172,34 @@ function extractMessageText(data: EvolutionMessageData): string {
     }
     default:
       return "[mensagem]";
+  }
+}
+
+/**
+ * Origem de anúncio (Click to WhatsApp). Duas fontes, ambas opcionais:
+ * 1) código do anúncio na mensagem pré-preenchida, ex.: "[A1]" (A + número);
+ * 2) externalAdReply/ctwaClid no contextInfo, se a Meta repassar.
+ * Retorna null quando não há nenhuma pista de anúncio.
+ */
+function extractAdAttribution(data: EvolutionMessageData): Record<string, string> | null {
+  // Nunca pode derrubar o recebimento da mensagem: qualquer erro vira "sem origem".
+  try {
+    const text = extractMessageText(data);
+    const codeMatch = text.match(/\[(A\d{1,3})\]/i);
+    const ctx = data.contextInfo ?? data.message?.extendedTextMessage?.contextInfo;
+    const ad = ctx?.externalAdReply;
+
+    const result: Record<string, string> = {};
+    if (codeMatch) result.ad_code = codeMatch[1].toUpperCase();
+    if (ad?.sourceId) result.ad_source_id = String(ad.sourceId);
+    if (ad?.ctwaClid) result.ctwa_clid = String(ad.ctwaClid);
+    if (ad?.sourceUrl) result.ad_source_url = String(ad.sourceUrl);
+    if (ad?.title) result.ad_title = String(ad.title);
+
+    return Object.keys(result).length > 0 ? result : null;
+  } catch (error) {
+    console.error("[Evolution] extractAdAttribution error:", error);
+    return null;
   }
 }
 
@@ -555,6 +598,9 @@ async function handleMessagesUpsert(
       }
     }
 
+    // Origem de anúncio: só na primeira mensagem recebida da conversa
+    const adAttribution = isFromMe ? null : extractAdAttribution(data);
+
     // Create conversation
     const { data: newConv, error: convCreateErr } = await supabase
       .from("messaging_conversations")
@@ -567,6 +613,7 @@ async function handleMessagesUpsert(
         contact_id: contactId,
         status: "open",
         priority: "normal",
+        ...(adAttribution ? { metadata: { ad_attribution: adAttribution } } : {}),
       })
       .select("id")
       .single();
@@ -585,6 +632,7 @@ async function handleMessagesUpsert(
           stageId: routingRule.stageId,
           conversationId,
           contactName: pushName || phone,
+          adAttribution,
         });
       }
     }
@@ -917,6 +965,7 @@ async function autoCreateDeal(
     stageId?: string | null;
     conversationId: string;
     contactName: string;
+    adAttribution?: Record<string, string> | null;
   }
 ) {
   try {
@@ -978,6 +1027,9 @@ async function autoCreateDeal(
             auto_created: true,
             created_from: "messaging_webhook",
             conversation_id: params.conversationId,
+            ...(params.adAttribution
+              ? { source_detail: "meta_ads", ...params.adAttribution }
+              : {}),
           },
         })
         .select("id")
